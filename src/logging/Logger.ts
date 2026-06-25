@@ -1,5 +1,7 @@
 import chalk from 'chalk'
 import cluster from 'cluster'
+import fs from 'fs'
+import path from 'path'
 import { sendDiscord } from './Discord'
 import { sendNtfy } from './Ntfy'
 import type { MicrosoftRewardsBot } from '../index'
@@ -42,6 +44,39 @@ function consoleOut(level: LogLevel, msg: string, chalkFn: ChalkFn | null): void
 
 function formatMessage(message: string | Error): string {
     return message instanceof Error ? `${message.message}\n${message.stack || ''}` : message
+}
+
+function shouldWriteSummaryLog(title: string, message: string): boolean {
+    const summaryMatchers: Array<{ title: string; includes?: string[]; exact?: string[] }> = [
+        { title: 'RUN-END' },
+        { title: 'ACCOUNT-END' },
+        { title: 'FLOW', includes: ['Collected: +'] },
+        { title: 'DAILY-SET', includes: ['have been completed'] },
+        { title: 'MORE-PROMOTIONS', includes: ['have been completed'] },
+        { title: 'APP-PROMOTIONS', includes: ['have been completed'] },
+        { title: 'SPECIAL-ACTIVITY', includes: ['have been completed'] },
+        { title: 'PUNCHCARD', includes: ['have been completed'] },
+        { title: 'CLAIM-BONUS-POINTS', includes: ['have been claimed'] },
+        { title: 'DAILY-CHECK-IN', includes: ['Completed Daily Check-In'] },
+        { title: 'READ-TO-EARN', includes: ['Completed Read to Earn'] },
+        { title: 'SEARCH-BING', includes: ['All required search points earned, stopping main search loop'] },
+        { title: 'SEARCH-BING-EXTRA', includes: ['All required search points earned during extra searches'] },
+        { title: 'SEARCH-BING', includes: ['Completed Bing searches'] },
+        { title: 'SEARCH-BING-MANUAL', includes: ['Completed manual extra desktop searches'] },
+        { title: 'URL-REWARD', includes: ['Completed UrlReward'] }
+    ]
+
+    return summaryMatchers.some(matcher => {
+        if (matcher.title !== title) {
+            return false
+        }
+
+        if (matcher.exact?.includes(message)) {
+            return true
+        }
+
+        return matcher.includes?.some(fragment => message.includes(fragment)) ?? false
+    })
 }
 
 export class Logger {
@@ -118,6 +153,10 @@ export class Logger {
             consoleOut(level, consoleStr, getColorFn(logColor))
         }
 
+        if (shouldWriteSummaryLog(title, formatted)) {
+            this.writeSummaryLog(cleanMsg)
+        }
+
         if (!webhookAllowed) {
             return
         }
@@ -134,6 +173,18 @@ export class Logger {
             }
         } else {
             process.send?.({ __ipcLog: { content: cleanMsg, level } })
+        }
+    }
+
+    private writeSummaryLog(message: string): void {
+        try {
+            const logsDir = path.join(process.cwd(), 'logs')
+            const summaryFile = path.join(logsDir, 'summary.log')
+
+            fs.mkdirSync(logsDir, { recursive: true })
+            fs.appendFileSync(summaryFile, `${message}\n`, 'utf8')
+        } catch (error) {
+            console.error('Failed to write summary log:', error)
         }
     }
 

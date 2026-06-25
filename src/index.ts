@@ -12,6 +12,7 @@ import BrowserUtils from './browser/BrowserUtils'
 import { IpcLog, Logger } from './logging/Logger'
 import Utils from './util/Utils'
 import { loadAccounts, loadConfig } from './util/Load'
+import { getRuntimeArgs, type RuntimeArgs } from './util/RuntimeArgs'
 import { checkNodeVersion } from './util/Validator'
 
 import { Login } from './browser/auth/Login'
@@ -73,6 +74,7 @@ interface UserData {
 export class MicrosoftRewardsBot {
     public logger: Logger
     public config
+    public runtimeArgs: RuntimeArgs
     public utils: Utils
     public activities: Activities = new Activities(this)
     public browser: { func: BrowserFunc; utils: BrowserUtils }
@@ -112,6 +114,7 @@ export class MicrosoftRewardsBot {
             gainedPoints: 0
         }
         this.logger = new Logger(this)
+        this.runtimeArgs = getRuntimeArgs()
         this.accounts = []
         this.cookies = { mobile: [], desktop: [] }
         this.utils = new Utils()
@@ -141,7 +144,7 @@ export class MicrosoftRewardsBot {
         this.logger.info(
             'main',
             'RUN-START',
-            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
+            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters} | extraDesktopSearches=${this.runtimeArgs.extraDesktopSearches}`
         )
 
         if (this.config.clusters > 1) {

@@ -58,6 +58,21 @@ npm run build
 npm run start
 ```
 
+If Microsoft adds a search task that the normal counters miss, you can force extra desktop searches for that run.
+Use `start` only after you have already built the project and `dist/` exists:
+
+```bash
+npm run start -- -extraDesktopSearches 100
+```
+
+If you have not built the project yet, use the TypeScript dev command instead:
+
+```bash
+npm run dev -- -extraDesktopSearches 100
+```
+
+If you just want the exact same daily extra-search behavior as the manual command, use the same CLI flag on the scheduled Docker run.
+
 ### Docker
 
 - Copy the sample [`compose.yaml`](compose.yaml)
@@ -72,6 +87,17 @@ ACCOUNT_1_PASSWORD=your_password
 > A valid `accounts.json` is automatically created based on these values, and saved locally to `./config/`
 
 - Review `compose.yaml` to adjust scheduling, timezone, and config options.
+
+> [!TIP]
+> Docker can pass CLI flags to each scheduled run with `RUN_ARGS`.
+> Example daily setup for the exact same behavior as `npm start -- -extraDesktopSearches 100`:
+>
+> ```yaml
+> CRON_SCHEDULE: '0 8 * * *'
+> RUN_ARGS: '-extraDesktopSearches 100'
+> ```
+>
+> That runs the same direct extra-search command once per day through Docker cron.
 
 > [!NOTE]
 > A valid `config.json` is auto-generated on first run using default values, and saved locally to `./config/`.
@@ -88,6 +114,7 @@ ACCOUNT_1_PASSWORD=your_password
 > [!TIP]
 > Monitor logs with `docker logs microsoft-rewards-script`, useful for viewing passwordless login codes or diagnosing issues.
 > You can also enable a webhook in `compose.yaml` for notifications.
+> A smaller milestone-only file is also written to `./logs/summary.log` on the host.
 
 ---
 

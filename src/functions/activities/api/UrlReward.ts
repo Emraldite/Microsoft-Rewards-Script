@@ -11,6 +11,24 @@ export class UrlReward extends Workers {
 
     private oldBalance: number = this.bot.userData.currentPoints
 
+    private isPunchCardChild(offerId: string): boolean {
+        return offerId.toLowerCase().includes('punchcard')
+    }
+
+    private isTimeGatedPunchCardStep(promotion: BasePromotion): boolean {
+        const text = `${promotion.title} ${promotion.description}`.toLowerCase()
+
+        return (
+            this.isPunchCardChild(promotion.offerId) &&
+            (text.includes('24 hours') ||
+                text.includes('wait 24') ||
+                text.includes('third punch') ||
+                text.includes('day 2') ||
+                text.includes('come back later') ||
+                text.includes('come back tomorrow'))
+        )
+    }
+
     public async doUrlReward(promotion: BasePromotion) {
         if (!this.bot.requestToken && this.bot.rewardsVersion === 'legacy') {
             this.bot.logger.warn(
@@ -22,6 +40,16 @@ export class UrlReward extends Workers {
         }
 
         const offerId = promotion.offerId
+        this.oldBalance = Number(this.bot.userData.currentPoints ?? 0)
+
+        if (this.isTimeGatedPunchCardStep(promotion)) {
+            this.bot.logger.info(
+                this.bot.isMobile,
+                'URL-REWARD',
+                `Skipping time-gated punch card step until Microsoft unlocks it | offerId=${offerId} | title="${promotion.title}"`
+            )
+            return
+        }
 
         this.bot.logger.info(
             this.bot.isMobile,
@@ -107,6 +135,12 @@ export class UrlReward extends Workers {
                     'URL-REWARD',
                     `Completed UrlReward | offerId=${offerId} | status=${response.status} | gainedPoints=${this.gainedPoints} | newBalance=${newBalance}`,
                     'green'
+                )
+            } else if (this.isPunchCardChild(offerId)) {
+                this.bot.logger.info(
+                    this.bot.isMobile,
+                    'URL-REWARD',
+                    `No immediate points for punch card child; assuming step may still count | offerId=${offerId} | status=${response.status} | oldBalance=${this.oldBalance} | newBalance=${newBalance}`
                 )
             } else {
                 this.bot.logger.warn(

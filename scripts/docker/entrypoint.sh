@@ -356,12 +356,23 @@ if [ ! -f /etc/cron.d/microsoft-rewards-cron.template ]; then
   exit 1
 fi
 
+CRON_ENV_FILE="$SCRIPT_DIR/scripts/docker/cron_env.sh"
+{
+  echo "#!/usr/bin/env bash"
+  echo "set -a"
+  while IFS='=' read -r name value; do
+    printf '%s=%q\n' "$name" "$value"
+  done < <(printenv)
+  echo "set +a"
+} > "$CRON_ENV_FILE"
+chmod 600 "$CRON_ENV_FILE"
+
 export TZ
 envsubst < /etc/cron.d/microsoft-rewards-cron.template > /etc/cron.d/microsoft-rewards-cron
 chmod 0644 /etc/cron.d/microsoft-rewards-cron
 crontab /etc/cron.d/microsoft-rewards-cron
 
-echo "[entrypoint] Cron configured with schedule: $CRON_SCHEDULE and timezone: $TZ; starting cron at $(date)"
+echo "[entrypoint] Cron configured with schedule: $CRON_SCHEDULE and timezone: $TZ; env exported to $CRON_ENV_FILE; starting cron at $(date)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. Start cron in foreground (PID 1)

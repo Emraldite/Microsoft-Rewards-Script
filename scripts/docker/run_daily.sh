@@ -8,6 +8,27 @@ cd /usr/src/microsoft-rewards-script
 
 LOCKFILE=/tmp/run_daily.lock
 
+run_script_once() {
+    local run_args="${1:-}"
+
+    echo "[$(date)] [run_daily.sh] Starting script..."
+
+    if [ -n "$run_args" ]; then
+        echo "[$(date)] [run_daily.sh] Using run arguments: $run_args"
+        # Intentionally rely on shell word splitting so RUN_ARGS can contain multiple CLI flags.
+        if npm start -- ${run_args}; then
+            echo "[$(date)] [run_daily.sh] Script completed successfully."
+        else
+            echo "[$(date)] [run_daily.sh] ERROR: Script failed!" >&2
+        fi
+    elif npm start; then
+        echo "[$(date)] [run_daily.sh] Script completed successfully."
+    else
+        echo "[$(date)] [run_daily.sh] ERROR: Script failed!" >&2
+    fi
+}
+
+
 # -------------------------------
 #  Function: Check and fix lockfile integrity
 # -------------------------------
@@ -143,13 +164,7 @@ else
     echo "[$(date)] [run_daily.sh] Skipping random sleep"
 fi
 
-# Start the actual script
-echo "[$(date)] [run_daily.sh] Starting script..."
-if npm start; then
-    echo "[$(date)] [run_daily.sh] Script completed successfully."
-else
-    echo "[$(date)] [run_daily.sh] ERROR: Script failed!" >&2
-fi
+run_script_once "${RUN_ARGS:-}"
 
 echo "[$(date)] [run_daily.sh] Script finished"
 # Lock is released automatically via trap

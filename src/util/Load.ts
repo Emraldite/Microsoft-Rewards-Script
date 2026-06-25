@@ -5,20 +5,37 @@ import path from 'path'
 
 import type { Account, ConfigSaveFingerprint } from '../interface/Account'
 import type { Config } from '../interface/Config'
+import { getRuntimeArgs } from './RuntimeArgs'
 import { validateAccounts, validateConfig } from './Validator'
 
 let configCache: Config
 
+function readFirstExistingFile(possiblePaths: string[], label: string): string {
+    for (const filePath of possiblePaths) {
+        if (fs.existsSync(filePath)) {
+            return fs.readFileSync(filePath, 'utf-8')
+        }
+    }
+
+    throw new Error(`Unable to find ${label}. Checked: ${possiblePaths.join(', ')}`)
+}
+
 export function loadAccounts(): Account[] {
     try {
-        let file = 'accounts.json'
+        const isDev = getRuntimeArgs().dev
+        const accountPaths = isDev
+            ? [
+                  path.join(__dirname, '../', 'accounts.dev.json'),
+                  path.join(process.cwd(), 'config', 'accounts.json'),
+                  path.join(process.cwd(), 'accounts.json')
+              ]
+            : [
+                  path.join(__dirname, '../', 'accounts.json'),
+                  path.join(process.cwd(), 'config', 'accounts.json'),
+                  path.join(process.cwd(), 'accounts.json')
+              ]
 
-        if (process.argv.includes('-dev')) {
-            file = 'accounts.dev.json'
-        }
-
-        const accountDir = path.join(__dirname, '../', file)
-        const accounts = fs.readFileSync(accountDir, 'utf-8')
+        const accounts = readFirstExistingFile(accountPaths, 'accounts file')
         const accountsData = JSON.parse(accounts)
 
         validateAccounts(accountsData)
@@ -35,8 +52,20 @@ export function loadConfig(): Config {
             return configCache
         }
 
-        const configDir = path.join(__dirname, '../', 'config.json')
-        const config = fs.readFileSync(configDir, 'utf-8')
+        const isDev = getRuntimeArgs().dev
+        const configPaths = isDev
+            ? [
+                  path.join(__dirname, '../', 'config.json'),
+                  path.join(process.cwd(), 'config', 'config.json'),
+                  path.join(process.cwd(), 'config.json')
+              ]
+            : [
+                  path.join(__dirname, '../', 'config.json'),
+                  path.join(process.cwd(), 'config', 'config.json'),
+                  path.join(process.cwd(), 'config.json')
+              ]
+
+        const config = readFirstExistingFile(configPaths, 'config file')
 
         const unverifiedConfig = JSON.parse(config)
         const configData = validateConfig(unverifiedConfig)

@@ -24,6 +24,7 @@ import type {
     PurplePromotionalItem
 } from '../interface/DashboardData'
 import type { Promotion } from '../interface/AppDashBoardData'
+import type { SearchRunOptions } from './activities/browser/Search'
 
 export default class Activities {
     private bot: MicrosoftRewardsBot
@@ -33,9 +34,14 @@ export default class Activities {
     }
 
     // Browser Activities
-    doSearch = async (data: DashboardData, page: Page, isMobile: boolean): Promise<number> => {
+    doSearch = async (
+        data: DashboardData,
+        page: Page,
+        isMobile: boolean,
+        options?: SearchRunOptions
+    ): Promise<number> => {
         const search = new Search(this.bot)
-        return await search.doSearch(data, page, isMobile)
+        return await search.doSearch(data, page, isMobile, options)
     }
 
     doSearchOnBing = async (promotion: BasePromotion, page: Page): Promise<void> => {

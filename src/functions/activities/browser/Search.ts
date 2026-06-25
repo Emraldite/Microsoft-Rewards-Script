@@ -5,13 +5,23 @@ import type { Counters, DashboardData } from '../../../interface/DashboardData'
 import { QueryCore } from '../../QueryEngine'
 import { Workers } from '../../Workers'
 
+export interface SearchRunOptions {
+    extraSearches?: number
+}
+
 export class Search extends Workers {
     private bingHome = 'https://bing.com'
     private searchPageURL = ''
     private searchCount = 0
 
-    public async doSearch(data: DashboardData, page: Page, isMobile: boolean): Promise<number> {
+    public async doSearch(
+        data: DashboardData,
+        page: Page,
+        isMobile: boolean,
+        options: SearchRunOptions = {}
+    ): Promise<number> {
         const startBalance = Number(this.bot.userData.currentPoints ?? 0)
+        const extraSearches = isMobile ? 0 : Math.max(0, options.extraSearches ?? 0)
 
         this.bot.logger.info(isMobile, 'SEARCH-BING', `Starting Bing searches | currentPoints=${startBalance}`)
 
@@ -33,6 +43,13 @@ export class Search extends Workers {
                 'SEARCH-BING',
                 `Search points remaining | Edge=${missingPoints.edgePoints} | Desktop=${missingPoints.desktopPoints} | Mobile=${missingPoints.mobilePoints}`
             )
+            if (extraSearches > 0) {
+                this.bot.logger.info(
+                    isMobile,
+                    'SEARCH-BING',
+                    `Manual extra desktop searches requested | count=${extraSearches}`
+                )
+            }
 
             const queryCore = new QueryCore(this.bot)
             const locale = (this.bot.userData.geoLocale ?? 'US').toUpperCase()
@@ -52,7 +69,7 @@ export class Search extends Workers {
                 sourceOrder: ['google', 'wikipedia', 'reddit', 'local']
             })
 
-            queries = [...new Set(queries.map(q => q.trim()).filter(Boolean))]
+            queries = this.normalizeQueries(queries)
 
             this.bot.logger.info(isMobile, 'SEARCH-BING', `Search query pool ready | count=${queries.length}`)
 
@@ -139,8 +156,8 @@ export class Search extends Workers {
                         sourceOrder: this.bot.config.searchSettings.queryEngines
                     })
 
-                    const merged = [...queries, ...extra].map(q => q.trim()).filter(Boolean)
-                    queries = [...new Set(merged)]
+                    const merged = [...queries, ...extra]
+                    queries = this.normalizeQueries(merged)
                     queries = this.bot.utils.shuffleArray(queries)
 
                     this.bot.logger.debug(isMobile, 'SEARCH-BING', `Query pool regenerated | count=${queries.length}`)
@@ -166,8 +183,8 @@ export class Search extends Workers {
                         sourceOrder: this.bot.config.searchSettings.queryEngines
                     })
 
-                    const merged = [...queries, ...extra].map(q => q.trim()).filter(Boolean)
-                    const newPool = [...new Set(merged)]
+                    const merged = [...queries, ...extra]
+                    const newPool = this.normalizeQueries(merged)
                     queries = this.bot.utils.shuffleArray(newPool)
 
                     this.bot.logger.info(
@@ -241,6 +258,63 @@ export class Search extends Workers {
                         }
                     }
                 }
+            }
+
+            if (extraSearches > 0) {
+                const manualQueries = await this.buildManualQueryPool(queryCore, queries, locale, langCode, extraSearches)
+                const manualStartBalance = Number(this.bot.userData.currentPoints ?? startBalance)
+
+                this.bot.logger.info(
+                    isMobile,
+                    'SEARCH-BING-MANUAL',
+                    `Starting manual extra desktop searches | count=${manualQueries.length}`
+                )
+
+                for (let i = 0; i < manualQueries.length; i++) {
+                    const query = manualQueries[i] as string
+                    const balanceBefore = Number(this.bot.userData.currentPoints ?? startBalance)
+
+                    this.bot.logger.info(
+                        isMobile,
+                        'SEARCH-BING-MANUAL',
+                        `Manual search ${i + 1}/${manualQueries.length} | query="${query}"`
+                    )
+
+                    await this.bingSearch(page, query, isMobile)
+
+                    try {
+                        const balanceAfter = await this.bot.browser.func.getCurrentPoints()
+                        const gainedPoints = Math.max(0, balanceAfter - balanceBefore)
+
+                        this.bot.userData.currentPoints = balanceAfter
+
+                        if (gainedPoints > 0) {
+                            this.bot.userData.gainedPoints = (this.bot.userData.gainedPoints ?? 0) + gainedPoints
+                            totalGainedPoints += gainedPoints
+                        }
+
+                        this.bot.logger.info(
+                            isMobile,
+                            'SEARCH-BING-MANUAL',
+                            `Manual search result | gainedPoints=${gainedPoints} | balance=${balanceAfter}`
+                        )
+                    } catch (error) {
+                        this.bot.logger.warn(
+                            isMobile,
+                            'SEARCH-BING-MANUAL',
+                            `Unable to refresh point balance after manual search | message=${error instanceof Error ? error.message : String(error)}`
+                        )
+                    }
+                }
+
+                const manualEndBalance = Number(this.bot.userData.currentPoints ?? manualStartBalance)
+                const manualTotalGained = Math.max(0, manualEndBalance - manualStartBalance)
+
+                this.bot.logger.info(
+                    isMobile,
+                    'SEARCH-BING-MANUAL',
+                    `Completed manual extra desktop searches | count=${manualQueries.length} | gainedPoints=${manualTotalGained} | finalBalance=${manualEndBalance}`
+                )
             }
 
             const finalBalance = Number(this.bot.userData.currentPoints ?? startBalance)
@@ -377,6 +451,43 @@ export class Search extends Workers {
         )
 
         return await this.bot.browser.func.getSearchPoints()
+    }
+
+    private normalizeQueries(queries: string[]): string[] {
+        return [...new Set(queries.map(q => q.trim()).filter(Boolean))]
+    }
+
+    private async buildManualQueryPool(
+        queryCore: QueryCore,
+        existingQueries: string[],
+        locale: string,
+        langCode: string,
+        requiredCount: number
+    ): Promise<string[]> {
+        let pool = this.bot.utils.shuffleArray(this.normalizeQueries(existingQueries))
+        let attempts = 0
+
+        while (pool.length < requiredCount && attempts < 5) {
+            attempts++
+
+            const extraQueries = await queryCore.queryManager({
+                shuffle: true,
+                related: true,
+                langCode,
+                geoLocale: locale,
+                sourceOrder: this.bot.config.searchSettings.queryEngines
+            })
+
+            pool = this.bot.utils.shuffleArray(this.normalizeQueries([...pool, ...extraQueries]))
+        }
+
+        if (pool.length < requiredCount) {
+            throw new Error(
+                `Unable to build enough unique manual search queries | required=${requiredCount} | available=${pool.length}`
+            )
+        }
+
+        return pool.slice(0, requiredCount)
     }
 
     private async randomScroll(page: Page, isMobile: boolean) {

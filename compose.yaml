@@ -1,18 +1,22 @@
 services:
     microsoft-rewards-script:
-        image: ghcr.io/thenetsky/microsoft-rewards-script:latest
+        build:
+            context: .
         container_name: microsoft-rewards-script
         restart: unless-stopped
         volumes:
             - ./config:/usr/src/microsoft-rewards-script/dist/config
             - ./sessions:/usr/src/microsoft-rewards-script/dist/browser/sessions
+            - ./logs:/usr/src/microsoft-rewards-script/logs
         environment:
             # ── Scheduling ───────────────────────────────────────────────────
-            TZ: 'America/Toronto'
+            TZ: 'America/Chicago'
             NODE_ENV: 'production'
             CRON_SCHEDULE: '0 7 * * *' # use crontab.guru to customize your schedule
+            # Example direct daily extra-search run: CRON_SCHEDULE: '0 8 * * *'
             RUN_ON_START: 'true' # run script immediately on container start
-            SKIP_RANDOM_SLEEP: 'false'
+            RUN_ARGS: '-extraDesktopSearches 100' # same as: npm start -- -extraDesktopSearches 100
+            SKIP_RANDOM_SLEEP: 'true'
             #MIN_SLEEP_MINUTES: "5"
             #MAX_SLEEP_MINUTES: "50"
             #STUCK_PROCESS_TIMEOUT_HOURS: "8"
