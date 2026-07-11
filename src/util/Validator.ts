@@ -20,7 +20,12 @@ const DelaySchema = z.object({
     max: NumberOrString
 })
 
-const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local'])
+const QueryEngineSchema = z.union([
+    z.enum(['google', 'wikipedia', 'wikirandom', 'hackernews', 'reddit', 'local']),
+    z
+        .string()
+        .regex(/^rss(\.[A-Za-z0-9_-]+){0,2}$/, 'Invalid rss selector (use rss, rss.<site>, or rss.<site>.<endpoint>)')
+])
 
 // Webhook
 const WebhookSchema = z.object({
@@ -41,40 +46,64 @@ const WebhookSchema = z.object({
             priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional()
         })
         .optional(),
+    telegram: z
+        .object({
+            enabled: z.boolean().optional(),
+            botToken: z.string(),
+            chatId: z.string()
+        })
+        .optional(),
     webhookLogFilter: LogFilterSchema
 })
 
 // Config
 export const ConfigSchema = z.object({
-    baseURL: z.string(),
     sessionPath: z.string(),
     headless: z.boolean(),
     clusters: z.number().int().nonnegative(),
     errorDiagnostics: z.boolean(),
     ensureStreakProtection: z.boolean(),
+    autoClaimPunchcardRewards: z.boolean(),
+    skipNonPointTasks: z.boolean().default(true),
     workers: z.object({
         doDailySet: z.boolean(),
-        doSpecialPromotions: z.boolean(),
         doMorePromotions: z.boolean(),
         doClaimBonusPoints: z.boolean(),
         doPunchCards: z.boolean(),
         doAppPromotions: z.boolean(),
         doDesktopSearch: z.boolean(),
         doMobileSearch: z.boolean(),
+        doBonusSearches: z.boolean(),
         doDailyCheckIn: z.boolean(),
-        doReadToEarn: z.boolean()
+        doReadToEarn: z.boolean(),
+        doActivateSearchPerk: z.boolean(),
+        doVisualSearch: z.boolean().default(false)
     }),
+    activities: z
+        .object({
+            urlReward: z.boolean().default(true),
+            searchOnBing: z.boolean().default(true)
+        })
+        .default({ urlReward: true, searchOnBing: true }),
     searchOnBingLocalQueries: z.boolean(),
     globalTimeout: NumberOrString,
     searchSettings: z.object({
         scrollRandomResults: z.boolean(),
         clickRandomResults: z.boolean(),
+        runOnZeroPoints: z.boolean().default(false),
+        maxBonusSearches: z.number().default(110),
         parallelSearching: z.boolean(),
         queryEngines: z.array(QueryEngineSchema),
         searchResultVisitTime: NumberOrString,
         searchDelay: DelaySchema,
         readDelay: DelaySchema
     }),
+    experimental: z
+        .object({
+            apiSearch: z.boolean().default(false),
+            apiSearchOnBing: z.boolean().default(false)
+        })
+        .default({ apiSearch: false, apiSearchOnBing: false }),
     debugLogs: z.boolean(),
     proxy: z.object({
         queryEngine: z.boolean()
@@ -92,7 +121,7 @@ export const AccountSchema = z.object({
     geoLocale: z.string(),
     langCode: z.string(),
     proxy: z.object({
-        proxyAxios: z.boolean(),
+        proxyHttp: z.boolean(),
         url: z.string(),
         port: z.number(),
         password: z.string(),
@@ -105,34 +134,47 @@ export const AccountSchema = z.object({
 })
 
 const defaultConfig: Config = {
-    baseURL: 'https://rewards.bing.com',
     sessionPath: 'sessions',
     headless: true,
     clusters: 1,
     errorDiagnostics: true,
     ensureStreakProtection: true,
+    autoClaimPunchcardRewards: false,
+    skipNonPointTasks: true,
     workers: {
         doDailySet: true,
-        doSpecialPromotions: true,
         doMorePromotions: true,
         doClaimBonusPoints: true,
         doPunchCards: true,
         doAppPromotions: true,
         doDesktopSearch: true,
         doMobileSearch: true,
+        doBonusSearches: false,
         doDailyCheckIn: true,
-        doReadToEarn: true
+        doReadToEarn: true,
+        doActivateSearchPerk: true,
+        doVisualSearch: false
+    },
+    activities: {
+        urlReward: true,
+        searchOnBing: true
     },
     searchOnBingLocalQueries: false,
     globalTimeout: '30sec',
     searchSettings: {
         scrollRandomResults: true,
         clickRandomResults: true,
+        runOnZeroPoints: false,
+        maxBonusSearches: 110,
         parallelSearching: true,
-        queryEngines: ['google', 'wikipedia', 'reddit', 'local'],
+        queryEngines: ['google', 'wikipedia', 'wikirandom', 'hackernews', 'reddit', 'local'],
         searchResultVisitTime: '10sec',
         searchDelay: { min: '30sec', max: '1min' },
         readDelay: { min: '30sec', max: '1min' }
+    },
+    experimental: {
+        apiSearch: false,
+        apiSearchOnBing: false
     },
     debugLogs: false,
     proxy: { queryEngine: true },
@@ -171,9 +213,9 @@ function setByPath<T>(obj: T, path: ReadonlyArray<string | number>, value: unkno
     if (head === undefined) return value as T
     const rest = path.slice(1)
     const base = obj ?? (typeof head === 'number' ? [] : {})
-    const cloned: any = Array.isArray(base) ? [...base] : { ...(base as object) }
-    cloned[head] = setByPath((base as any)[head], rest, value)
-    return cloned
+    const cloned = (Array.isArray(base) ? [...base] : { ...(base as object) }) as Record<string | number, unknown>
+    cloned[head] = setByPath((base as Record<string | number, unknown>)[head], rest, value)
+    return cloned as T
 }
 
 function fillMissing(data: unknown, defaults: unknown, path = ''): unknown {
@@ -239,7 +281,7 @@ export function validateAccounts(data: unknown): Account[] {
             console.error(`[Accounts] "${path}" ${issue.message} (code: ${issue.code})`)
         }
     }
-    throw new Error(`Accounts validation failed: ${result.error.issues.length} issue(s) — see logs above`)
+    throw new Error(`Accounts validation failed: ${result.error.issues.length} issue(s) - see logs above`)
 }
 
 export function checkNodeVersion(): void {

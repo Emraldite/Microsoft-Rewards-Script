@@ -4,4 +4,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TZ=${TZ}
 
 # Run automation according to CRON_SCHEDULE; redirect both stdout & stderr to Docker logs
-${CRON_SCHEDULE} /bin/bash -lc 'source /usr/src/microsoft-rewards-script/scripts/docker/cron_env.sh && /usr/src/microsoft-rewards-script/scripts/docker/run_daily.sh' >> /proc/1/fd/1 2>&1
+${CRON_SCHEDULE} /usr/src/microsoft-rewards-script/scripts/docker/run_daily.sh >> /proc/1/fd/1 2>&1
+
+# Check only for a claimable bonus banner every hour; skip searches and all other tasks
+${BONUS_CRON_SCHEDULE} SKIP_RANDOM_SLEEP=true RUN_ARGS='-claimBonusPointsOnly' /usr/src/microsoft-rewards-script/scripts/docker/run_daily.sh >> /proc/1/fd/1 2>&1

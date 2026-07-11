@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { sendDiscord } from './Discord'
 import { sendNtfy } from './Ntfy'
+import { sendTelegram } from './Telegram'
 import type { MicrosoftRewardsBot } from '../index'
 import { errorDiagnostic } from '../util/ErrorDiagnostic'
 import type { LogFilter } from '../interface/Config'
@@ -170,6 +171,11 @@ export class Logger {
             if (config.webhook.ntfy?.enabled && config.webhook.ntfy.url) {
                 if (level === 'debug') return
                 sendNtfy(config.webhook.ntfy, cleanMsg, level)
+            }
+
+            if (config.webhook.telegram?.enabled && config.webhook.telegram.botToken && config.webhook.telegram.chatId) {
+                if (level === 'debug') return
+                sendTelegram(config.webhook.telegram, cleanMsg, level)
             }
         } else {
             process.send?.({ __ipcLog: { content: cleanMsg, level } })
