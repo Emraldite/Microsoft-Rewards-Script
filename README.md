@@ -8,11 +8,16 @@
 >
 > Use at your own risk - some features may not work as expected.
 
+> [!IMPORTANT]
+> This fork's active branch is still named `v3`, but its code is based on upstream v4.0.3 and supports the modern dashboard. The branch name is retained for repository continuity; it does not indicate legacy-dashboard support.
+
 ---
 
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
+- [Fork Customizations](#fork-customizations)
+- [Resume Development](#resume-development)
 - [Quick Setup](#quick-setup)
     - [Bare metal](#bare-metal)
         - [Get the script](#get-the-script)
@@ -33,6 +38,32 @@
     - [Webhooks](#webhooks)
 - [Troubleshooting](#troubleshooting)
 - [Disclaimer](#disclaimer)
+
+---
+
+## Fork Customizations
+
+This fork adds the following behavior on top of the v4.0.3 codebase:
+
+- Docker Compose builds the local repository instead of pulling a prebuilt image.
+- `RUN_ARGS` forwards runtime flags to scheduled runs, including `-extraDesktopSearches <count>`.
+- `BONUS_CRON_SCHEDULE` runs an hourly `-claimBonusPointsOnly` job that skips unrelated tasks.
+- Bonus claims use freshly loaded dashboard data.
+- Milestone events persist to `./logs/summary.log`.
+- Punch-card URL tasks avoid false failure warnings and skip clearly time-gated child steps.
+
+## Resume Development
+
+Project continuity notes live in [`.agents/PRD.md`](.agents/PRD.md) and the four `.agents/memory-*.md` files. Start by reading those files, then run:
+
+```bash
+git status --short
+git log -5 --oneline
+npm run build
+npm run lint
+```
+
+The next priority is a live-account smoke test of the v4 migration and an observed hourly bonus claim. Keep credentials in the untracked `.env`; never add them to Git or documentation.
 
 ---
 
@@ -95,18 +126,34 @@ npm run start
 - Copy and rename [`env.example`](env.example) to `.env` and add your account credentials:
 
 ```env
+COMPOSE_PROFILES=v3
 ACCOUNT_1_EMAIL=email@example.com
 ACCOUNT_1_PASSWORD=your_password
 ```
 
+- Set `COMPOSE_PROFILES=v3` for the legacy dashboard or `COMPOSE_PROFILES=v4` for the modern dashboard. The v3 profile builds the last customized v3 snapshot from before this fork's v4 migration; the v4 profile builds the current working tree.
 - Review `compose.yaml` to adjust scheduling, timezone, and config options.
 
-The local compose file builds this repository so custom changes are included. `RUN_ARGS` can pass runtime flags; for example, `-extraDesktopSearches 100` performs 100 additional desktop searches after the normal points search.
+The profiles use separate config, session, and log directories because v3 and v4 store different data. To switch versions:
 
-`BONUS_CRON_SCHEDULE` runs a separate bonus-only check at 15 minutes past every hour. It logs in, refreshes the dashboard, claims an available bonus banner, and skips all searches and other activities.
+```bash
+docker compose down --remove-orphans
+```
+
+Change `COMPOSE_PROFILES` in `.env`, then run:
+
+```bash
+docker compose up -d --build
+```
+
+Do not enable both profiles together: both would attempt to automate the same account.
+
+Both profiles preserve this fork's matching customizations. `RUN_ARGS` can pass runtime flags; for example, `-extraDesktopSearches 100` performs 100 additional desktop searches after the normal points search.
+
+In the v4 profile, `BONUS_CRON_SCHEDULE` runs a separate bonus-only check at 15 minutes past every hour. It logs in, refreshes the dashboard, claims an available bonus banner, and skips all searches and other activities. The preserved v3 profile uses its original daily bonus-claim flow.
 
 > [!NOTE]
-> A valid `config.json` is auto-generated on first run using default values, and saved locally to `./config/`.
+> A valid `config.json` is auto-generated on first run using default values. The v3 profile saves its data under `./config-v3/`, `./sessions-v3/`, and `./logs-v3/`; v4 continues using `./config/`, `./sessions/`, and `./logs/`.
 > Optionally, use `CONFIG_*` variables in the `environment:` section of the `compose.yaml` to customise your options (e.g., clusters, webhook, etc.).
 > A full list of available options are in the [table below](#configuration-options).
 > `CONFIG_*` variables are applied on every startup and always take precedence over `./config/config.json`.

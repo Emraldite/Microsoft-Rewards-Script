@@ -10,5 +10,8 @@ note
 .playwright-chromium-installed
 .stfolder/
 .env
-.AGENT
 config
+.agents/
+config-v3/
+sessions-v3/
+logs-v3/
