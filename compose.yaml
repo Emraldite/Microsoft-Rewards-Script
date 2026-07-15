@@ -11,12 +11,14 @@ services:
             - ./config-v3:/usr/src/microsoft-rewards-script/dist/config:z
             - ./sessions-v3:/usr/src/microsoft-rewards-script/dist/browser/sessions:z
             - ./logs-v3:/usr/src/microsoft-rewards-script/logs:z
+            - ./src/crontab.v3.template:/etc/cron.d/microsoft-rewards-cron.template:ro,z
         env_file:
             - path: .env
         environment:
             TZ: 'America/Chicago'
             NODE_ENV: 'production'
             CRON_SCHEDULE: '0 7 * * *'
+            BONUS_CRON_SCHEDULE: '0 23 * * *'
             RUN_ON_START: 'true'
             SKIP_RANDOM_SLEEP: 'false'
             #RUN_ARGS: '-extraDesktopSearches 100'
@@ -49,7 +51,7 @@ services:
             TZ: 'America/Chicago'
             NODE_ENV: 'production'
             CRON_SCHEDULE: '0 7 * * *'
-            BONUS_CRON_SCHEDULE: '15 * * * *'
+            BONUS_CRON_SCHEDULE: '0 23 * * *'
             RUN_ON_START: 'true'
             SKIP_RANDOM_SLEEP: 'false'
             #RUN_ARGS: '-extraDesktopSearches 100'

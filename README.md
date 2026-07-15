@@ -47,7 +47,7 @@ This fork adds the following behavior on top of the v4.0.3 codebase:
 
 - Docker Compose builds the local repository instead of pulling a prebuilt image.
 - `RUN_ARGS` forwards runtime flags to scheduled runs, including `-extraDesktopSearches <count>`.
-- `BONUS_CRON_SCHEDULE` runs an hourly `-claimBonusPointsOnly` job that skips unrelated tasks.
+- `BONUS_CRON_SCHEDULE` runs an 11:00 PM fallback: bonus-only on v4 and the normal flow with extra CLI arguments cleared on legacy v3.
 - Bonus claims use freshly loaded dashboard data.
 - Milestone events persist to `./logs/summary.log`.
 - Punch-card URL tasks avoid false failure warnings and skip clearly time-gated child steps.
@@ -63,7 +63,7 @@ npm run build
 npm run lint
 ```
 
-The next priority is a live-account smoke test of the v4 migration and an observed hourly bonus claim. Keep credentials in the untracked `.env`; never add them to Git or documentation.
+The next priority is a live-account smoke test of the v4 migration and an observed nightly bonus claim. Keep credentials in the untracked `.env`; never add them to Git or documentation.
 
 ---
 
@@ -150,7 +150,7 @@ Do not enable both profiles together: both would attempt to automate the same ac
 
 Both profiles preserve this fork's matching customizations. `RUN_ARGS` can pass runtime flags; for example, `-extraDesktopSearches 100` performs 100 additional desktop searches after the normal points search.
 
-In the v4 profile, `BONUS_CRON_SCHEDULE` runs a separate bonus-only check at 15 minutes past every hour. It logs in, refreshes the dashboard, claims an available bonus banner, and skips all searches and other activities. The preserved v3 profile uses its original daily bonus-claim flow.
+In the v4 profile, `BONUS_CRON_SCHEDULE` runs a separate bonus-only fallback at 11:00 PM Central. The normal 7:00 AM run still checks for a bonus after completing its other work; the nightly fallback logs in, refreshes the dashboard, claims an available bonus banner, and skips all searches and other activities. The preserved v3 profile also retries at 11:00 PM, but because legacy v3 has no bonus-only flag, it reruns the normal flow with `RUN_ARGS` cleared; completed activities and searches are skipped.
 
 > [!NOTE]
 > A valid `config.json` is auto-generated on first run using default values. The v3 profile saves its data under `./config-v3/`, `./sessions-v3/`, and `./logs-v3/`; v4 continues using `./config/`, `./sessions/`, and `./logs/`.

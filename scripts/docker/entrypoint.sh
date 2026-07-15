@@ -8,7 +8,7 @@ SCRIPT_DIR="/usr/src/microsoft-rewards-script"
 
 # 1. Timezone: default to UTC if not provided
 : "${TZ:=UTC}"
-: "${BONUS_CRON_SCHEDULE:=15 * * * *}"
+: "${BONUS_CRON_SCHEDULE:=0 23 * * *}"
 export BONUS_CRON_SCHEDULE
 ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime
 echo "$TZ" > /etc/timezone
