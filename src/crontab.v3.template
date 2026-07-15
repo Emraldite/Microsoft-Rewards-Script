@@ -1,0 +1,10 @@
+# Set PATH so cron jobs can find node/npm
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Set timezone for cron jobs
+TZ=${TZ}
+
+# Normal daily automation run
+${CRON_SCHEDULE} /bin/bash -lc 'source /usr/src/microsoft-rewards-script/scripts/docker/cron_env.sh && /usr/src/microsoft-rewards-script/scripts/docker/run_daily.sh' >> /proc/1/fd/1 2>&1
+
+# Legacy v3 has no bonus-only flag, so retry the normal flow without extra CLI arguments
+${BONUS_CRON_SCHEDULE} /bin/bash -lc 'source /usr/src/microsoft-rewards-script/scripts/docker/cron_env.sh && export RUN_ARGS="" && /usr/src/microsoft-rewards-script/scripts/docker/run_daily.sh' >> /proc/1/fd/1 2>&1
