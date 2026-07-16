@@ -489,7 +489,7 @@ export class MicrosoftRewardsBot {
 
                 if (this.runtimeArgs.claimBonusPointsOnly) {
                     this.logger.info('main', 'CLAIM-BONUS-POINTS', 'Hourly bonus-only check started')
-                    await this.workers.doClaimBonusPoints(data)
+                    await this.workers.doClaimBonusPoints()
                     const finalPoints = await this.browser.func.getCurrentPoints()
                     return { initialPoints, collectedPoints: Math.max(0, finalPoints - initialPoints) }
                 }
@@ -651,10 +651,7 @@ export class MicrosoftRewardsBot {
                     }`
                 )
 
-                if (this.config.workers.doClaimBonusPoints) {
-                    const refreshedData = await this.browser.func.getDashboardData()
-                    await this.workers.doClaimBonusPoints(refreshedData)
-                }
+                if (this.config.workers.doClaimBonusPoints) await this.workers.doClaimBonusPoints()
 
                 const finalPoints = await this.browser.func.getCurrentPoints()
                 const collectedPoints = finalPoints - initialPoints
